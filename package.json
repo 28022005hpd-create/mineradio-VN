@@ -5,7 +5,7 @@
   "description": "Immersive Windows music player with Vietnamese and English interfaces.",
   "author": "Mineradio",
   "license": "GPL-3.0-only",
-  "main": "desktop/main-localized.js",
+  "main": "desktop/main-providers.js",
   "private": true,
   "scripts": {
     "start": "electron .",

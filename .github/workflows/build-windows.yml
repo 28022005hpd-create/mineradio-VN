@@ -41,7 +41,7 @@ jobs:
         shell: pwsh
         run: npm ci
 
-      - name: Validate localization JavaScript
+      - name: Validate localization and provider JavaScript
         shell: pwsh
         run: |
           node --check public/js/i18n.js
@@ -51,8 +51,13 @@ jobs:
           node --check public/js/i18n-content-boundaries.js
           node --check public/js/i18n-native-bridge.js
           node --check public/js/i18n-language-ui.js
+          node --check public/js/western-providers.js
           node --check public/js/index-loader.js
           node --check desktop/main-localized.js
+          node --check desktop/main-providers.js
+          node --check western-providers-api.js
+          node --check spotify-oauth-bridge-api.js
+          node --check spotify-api.js
           node --check build/localize-installer.js
 
       - name: Build Windows NSIS installer

@@ -41,6 +41,16 @@ jobs:
         shell: pwsh
         run: npm ci
 
+      - name: Validate localization JavaScript
+        shell: pwsh
+        run: |
+          node --check public/js/i18n.js
+          node --check public/js/i18n-extra.js
+          node --check public/js/i18n-strict.js
+          node --check public/js/i18n-ui-final.js
+          node --check public/js/i18n-native-bridge.js
+          node --check public/js/index-loader.js
+
       - name: Build Windows NSIS installer
         shell: pwsh
         run: npm run build:win -- --publish never

@@ -116,6 +116,7 @@
     'js/modules/10-shell/04-desktop-overlay-fullscreen.js',
     'js/modules/10-shell/05-startup-bindings.js',
     'js/modules/11-main-loop.js',
+    'js/western-playback.js',
   ];
 
   function readModule(path) {

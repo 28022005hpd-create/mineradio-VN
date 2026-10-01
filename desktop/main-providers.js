@@ -16,8 +16,23 @@ const providerRoot = process.env.MINERADIO_PROVIDER_CONFIG_DIR;
 if (!process.env.SPOTIFY_CONFIG_FILE) process.env.SPOTIFY_CONFIG_FILE = path.join(providerRoot, 'spotify-credentials.json');
 if (!process.env.SPOTIFY_TOKEN_FILE) process.env.SPOTIFY_TOKEN_FILE = path.join(providerRoot, 'spotify-token.json');
 
-// Order matters: OAuth must wrap createServer before the broader /api/spotify
-// bridge so /api/spotify/oauth/start is handled by the PKCE callback bridge.
+// The Web Playback SDK / Spotify Connect control needs these official scopes.
+// Merge instead of replace so users with custom scopes keep them.
+const playbackScopes = [
+  'streaming',
+  'user-read-email',
+  'user-read-private',
+  'user-read-playback-state',
+  'user-modify-playback-state',
+];
+const configuredScopes = String(process.env.MINERADIO_SPOTIFY_SCOPES || process.env.SPOTIFY_SCOPES || '')
+  .split(/[\s,;]+/)
+  .filter(Boolean);
+process.env.MINERADIO_SPOTIFY_SCOPES = Array.from(new Set(playbackScopes.concat(configuredScopes))).join(' ');
+
+// Request order matters. The first installed wrapper receives requests first,
+// so exact playback routes must precede OAuth, then the broad provider bridge.
+require('../western-playback-api').installWesternPlaybackBridge();
 require('../spotify-oauth-bridge-api').installSpotifyOAuthBridge();
 require('../western-providers-api').installHttpProviderBridge();
 module.exports = require('./main-localized');

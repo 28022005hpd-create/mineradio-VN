@@ -13,10 +13,34 @@
   function translate(text) {
     try {
       if (window.MineradioFinalI18n && typeof window.MineradioFinalI18n.translate === 'function') {
-        return window.MineradioFinalI18n.translate(text);
+        return window.MineradioFinalI18n.translate(String(text == null ? '' : text));
       }
     } catch (_) { }
-    return text;
+    return String(text == null ? '' : text);
+  }
+
+  // Browser-native alert/confirm/prompt surfaces are synchronous, so a DOM
+  // MutationObserver cannot localize them after they appear. Translate their
+  // app-owned labels before Chromium opens the dialog. Unknown provider/song
+  // content is preserved by the translator instead of being destructively scrubbed.
+  function patchSynchronousDialogs() {
+    if (window.__mineradioSynchronousDialogsLocalized) return;
+    window.__mineradioSynchronousDialogsLocalized = true;
+
+    if (typeof window.alert === 'function') {
+      const originalAlert = window.alert.bind(window);
+      window.alert = function (message) { return originalAlert(translate(message)); };
+    }
+    if (typeof window.confirm === 'function') {
+      const originalConfirm = window.confirm.bind(window);
+      window.confirm = function (message) { return originalConfirm(translate(message)); };
+    }
+    if (typeof window.prompt === 'function') {
+      const originalPrompt = window.prompt.bind(window);
+      window.prompt = function (message, defaultValue) {
+        return originalPrompt(translate(message), defaultValue);
+      };
+    }
   }
 
   function apply(root) {
@@ -37,6 +61,7 @@
   }
 
   function start() {
+    patchSynchronousDialogs();
     apply(document);
     const observer = new MutationObserver(function (mutations) {
       mutations.forEach(function (m) {

@@ -5,8 +5,9 @@
   const HAN_RUN_RE = /[\u3400-\u9fff\uf900-\ufaff]+/g;
   const ATTRS = ['title', 'aria-label', 'aria-description', 'placeholder', 'data-tooltip', 'data-label'];
 
-  // Content that belongs to the music/user/provider must not be destructively
-  // translated. Exact app placeholders are still translated separately.
+  // Real content supplied by a music provider or the user. Unknown Han text in
+  // these fields is valid content (song/artist/album/lyric/comment/playlist name)
+  // and must never be replaced by a generic UI fallback.
   const RAW_CONTENT = [
     '#stage-lyrics', '#desktop-lyrics-root', '#desktop-lyrics',
     '.lyric-line', '.lyrics-line', '[data-lyric-line]',
@@ -15,19 +16,25 @@
     '.search-result-title', '.search-artist-link',
     '.mini-queue-name', '.mini-queue-sub', '.qi-name', '.queue-artist-link',
     '.pl-name', '.pl-detail-title', '.pl-detail-row-title', '.pl-detail-row-artist',
+    '.detail-title', '#album-detail-title', '.artist-song-name', '.comment-text',
     '.home-card-title', '.home-card-sub', '#home-next-title', '#home-next-artist',
     '.home-discovery-title', '.home-discovery-sub',
     '.user-name', '.user-nickname', '.account-name', '.profile-name'
   ].join(',');
 
-  // These surfaces combine provider metadata with app-owned status text. Translate
-  // only known UI fragments and counters, while leaving unknown Han metadata intact.
+  // Mixed provider metadata + app status. Known UI fragments/counters are
+  // translated, but unknown Han is retained because it may be an artist, album,
+  // creator, nickname, or other provider-owned content.
   const MIXED_CONTENT = [
     '.search-result-meta', '.pl-sub', '.pl-detail-sub', '.pl-detail-count',
-    '.home-platform-daily-list', '.home-platform-track-list',
-    '.track-detail-meta', '.track-detail-sub', '.song-meta', '.track-meta'
+    '.detail-sub', '#album-detail-sub', '.detail-v', '.detail-chip',
+    '.artist-song-meta', '.comment-meta', '.track-detail-meta', '.track-detail-sub',
+    '.song-meta', '.track-meta',
+    '.home-platform-daily-list', '.home-platform-track-list'
   ].join(',');
 
+  // [Chinese source, Vietnamese, English]. These extend the two existing locale
+  // tables for UI generated at runtime inside previously protected containers.
   const EXTRA_ROWS = [
     // Search and source switching
     ['搜索历史', 'Lịch sử tìm kiếm', 'Search history'],
@@ -42,7 +49,6 @@
     ['正在匹配', 'Đang tìm nguồn khớp', 'Matching sources'],
     ['保留当前进度', 'Giữ nguyên tiến độ hiện tại', 'Keep current position'],
     ['当前音源', 'Nguồn phát hiện tại', 'Current source'],
-    ['当前', 'Hiện tại', 'Current'],
     ['匹配源', 'Nguồn khớp', 'Matched source'],
     ['可切换', 'Có thể chuyển', 'Available'],
     ['检测中', 'Đang kiểm tra', 'Checking'],
@@ -54,7 +60,6 @@
     ['暂时没有匹配到同名同歌手版本。', 'Tạm thời chưa tìm thấy bản cùng tên và cùng ca sĩ.', 'No same-title, same-artist version is currently available.'],
     ['该平台无正版音源', 'Nền tảng này không có nguồn phát phù hợp', 'No suitable source on this platform'],
     ['正在切换音源', 'Đang chuyển nguồn phát', 'Switching audio source'],
-    ['当前歌曲', 'Bài hiện tại', 'Current track'],
     ['音源切换失败', 'Chuyển nguồn phát thất bại', 'Source switch failed'],
     ['已保留当前播放队列，请稍后再试。', 'Đã giữ nguyên hàng đợi hiện tại. Vui lòng thử lại sau.', 'The current queue was preserved. Please try again later.'],
     ['QQ 播放需会话/授权', 'QQ Music cần phiên đăng nhập/quyền phát', 'QQ Music playback requires a session/authorization'],
@@ -79,12 +84,9 @@
     ['队列为空，先搜索或打开歌单', 'Hàng đợi trống. Hãy tìm kiếm hoặc mở playlist trước.', 'Queue is empty. Search or open a playlist first.'],
     ['队列为空，搜索后点 + 设为下一首', 'Hàng đợi trống. Sau khi tìm kiếm, bấm + để đặt bài tiếp theo.', 'Queue is empty. Search, then press + to set the next track.'],
     ['下一首播放', 'Phát tiếp theo', 'Play next'],
-    ['下', 'Tiếp', 'Next'],
-    ['未知歌手', 'Không rõ ca sĩ', 'Unknown artist'],
     ['取消红心', 'Bỏ yêu thích', 'Remove like'],
     ['红心喜欢', 'Yêu thích', 'Like'],
     ['收藏到歌单', 'Lưu vào playlist', 'Save to playlist'],
-    ['移除', 'Gỡ bỏ', 'Remove'],
 
     // Playlist panel/detail
     ['Mineradio 内置歌单', 'Playlist tích hợp Mineradio', 'Mineradio built-in playlists'],
@@ -101,12 +103,8 @@
     ['正在预载后续歌曲', 'Đang tải trước các bài tiếp theo', 'Preloading later tracks'],
     ['继续滚动加载', 'Tiếp tục cuộn để tải', 'Keep scrolling to load'],
     ['已加载全部', 'Đã tải toàn bộ', 'Loaded all'],
-    ['取消收藏', 'Bỏ lưu', 'Unsave'],
-    ['重命名', 'Đổi tên', 'Rename'],
-    ['删除', 'Xóa', 'Delete'],
     ['回到顶部', 'Về đầu', 'Back to top'],
     ['歌单详情', 'Chi tiết playlist', 'Playlist details'],
-    ['载入中', 'Đang tải', 'Loading'],
     ['播放歌单', 'Phát playlist', 'Play playlist'],
     ['后续歌曲载入失败，可继续滚动重试', 'Tải các bài tiếp theo thất bại; tiếp tục cuộn để thử lại', 'Failed to load later tracks; keep scrolling to retry'],
     ['歌单详情加载失败，请稍后重试', 'Tải chi tiết playlist thất bại. Vui lòng thử lại sau.', 'Failed to load playlist details. Please try again later.'],
@@ -122,7 +120,88 @@
     ['登录后显示我的播客', 'Đăng nhập để xem podcast của tôi', 'Sign in to view my podcasts'],
     ['暂无播客数据', 'Chưa có dữ liệu podcast', 'No podcast data yet'],
 
-    // Account/login terms that are frequently generated dynamically
+    // Track / album / artist detail
+    ['当前酷狗歌曲缺少稳定专辑详情接口，暂不能按当前音源打开专辑。', 'Bài Kugou hiện tại chưa có API chi tiết album ổn định nên chưa thể mở album theo nguồn này.', 'The current Kugou track has no stable album-detail API, so its album cannot be opened from this source yet.'],
+    ['汽水当前作为匹配源接入，暂不能按当前音源打开专辑详情。', 'Qishui hiện được dùng làm nguồn khớp nên chưa thể mở chi tiết album từ nguồn này.', 'Qishui is currently used as a matching source, so album details cannot be opened from it yet.'],
+    ['当前歌曲缺少可用专辑 ID，重新搜索或播放新版结果后再打开专辑。', 'Bài hiện tại thiếu ID album khả dụng. Hãy tìm lại hoặc phát kết quả mới rồi mở album.', 'The current track has no usable album ID. Search again or play a newer result before opening the album.'],
+    ['已收藏专辑', 'Đã lưu album', 'Album saved'],
+    ['收藏专辑', 'Lưu album', 'Save album'],
+    ['当前平台暂不支持收藏专辑', 'Nền tảng hiện tại chưa hỗ trợ lưu album', 'The current platform does not support saving albums yet'],
+    ['专辑已收藏到', 'Đã lưu album trên ', 'Album saved to '],
+    ['已取消收藏专辑', 'Đã bỏ lưu album', 'Album unsaved'],
+    ['请重新授权后再收藏专辑', 'Hãy cấp quyền lại trước khi lưu album', 'Re-authorize before saving the album'],
+    ['专辑收藏操作失败', 'Thao tác lưu album thất bại', 'Album save operation failed'],
+    ['无缝衔接 开', 'Phát liền mạch: Bật', 'Gapless playback: On'],
+    ['无缝衔接 关', 'Phát liền mạch: Tắt', 'Gapless playback: Off'],
+    ['专辑无缝衔接已开启', 'Đã bật phát album liền mạch', 'Album gapless playback enabled'],
+    ['专辑无缝衔接已关闭', 'Đã tắt phát album liền mạch', 'Album gapless playback disabled'],
+    ['暂无专辑曲目', 'Chưa có bài trong album', 'No album tracks yet'],
+    ['暂无热门歌曲', 'Chưa có bài nổi bật', 'No popular tracks yet'],
+    ['专辑详情', 'Chi tiết album', 'Album details'],
+    ['专辑曲目', 'Các bài trong album', 'Album tracks'],
+    ['正在载入专辑曲目...', 'Đang tải các bài trong album...', 'Loading album tracks...'],
+    ['专辑详情加载失败', 'Tải chi tiết album thất bại', 'Failed to load album details'],
+    ['按专辑顺序播放', 'Phát theo thứ tự album', 'Play in album order'],
+    ['歌手详情', 'Chi tiết ca sĩ', 'Artist details'],
+    ['来自当前播放', 'Từ bài đang phát', 'From current playback'],
+    ['关联歌手', 'Ca sĩ liên quan', 'Related artist'],
+    ['所属专辑', 'Album', 'Album'],
+    ['热门歌曲', 'Bài nổi bật', 'Popular tracks'],
+    ['当前 QQ 歌曲缺少 singerMid，无法打开 QQ 歌手主页。', 'Bài QQ hiện tại thiếu singerMid nên không thể mở trang ca sĩ QQ.', 'The current QQ track is missing singerMid, so the QQ artist page cannot be opened.'],
+    ['当前歌曲缺少可用的歌手主页信息', 'Bài hiện tại thiếu thông tin trang ca sĩ khả dụng', 'The current track has no usable artist-page information'],
+    ['正在载入 QQ 歌手主页...', 'Đang tải trang ca sĩ QQ...', 'Loading QQ artist page...'],
+    ['正在载入歌手主页...', 'Đang tải trang ca sĩ...', 'Loading artist page...'],
+    ['歌手资料与当前歌曲不匹配，已停止展示错误主页。', 'Thông tin ca sĩ không khớp bài hiện tại nên đã dừng hiển thị trang sai.', 'Artist data does not match the current track, so the incorrect page was not shown.'],
+    ['歌手主页加载失败', 'Tải trang ca sĩ thất bại', 'Failed to load artist page'],
+    ['歌曲详情', 'Chi tiết bài hát', 'Track details'],
+    ['歌曲名', 'Tên bài hát', 'Track name'],
+    ['时长', 'Thời lượng', 'Duration'],
+    ['歌词源', 'Nguồn lời bài hát', 'Lyrics source'],
+    ['自定义歌词', 'Lời tùy chỉnh', 'Custom lyrics'],
+    ['占位歌词', 'Lời tạm', 'Placeholder lyrics'],
+    ['原词', 'Lời gốc', 'Original lyrics'],
+    ['自定义封面', 'Ảnh bìa tùy chỉnh', 'Custom cover'],
+    ['当前歌曲', 'Bài hiện tại', 'Current track'],
+    ['未知专辑', 'Không rõ album', 'Unknown album'],
+    ['未知歌手', 'Không rõ ca sĩ', 'Unknown artist'],
+    ['未知', 'Không rõ', 'Unknown'],
+    ['本地上传', 'Tệp cục bộ', 'Local upload'],
+    ['网易云播客', 'Podcast NetEase Cloud Music', 'NetEase Cloud Music podcast'],
+    ['当前平台暂无评论接口', 'Nền tảng hiện tại chưa có API bình luận', 'The current platform has no comments API'],
+    ['正在载入评论...', 'Đang tải bình luận...', 'Loading comments...'],
+    ['评论加载失败', 'Tải bình luận thất bại', 'Failed to load comments'],
+    ['暂无评论', 'Chưa có bình luận', 'No comments yet'],
+    ['写下你的评论', 'Viết bình luận của bạn', 'Write your comment'],
+    ['发送中', 'Đang gửi', 'Sending'],
+    ['发送', 'Gửi', 'Send'],
+    ['当前平台评论只读', 'Bình luận trên nền tảng này chỉ đọc', 'Comments are read-only on this platform'],
+    ['先输入评论内容', 'Hãy nhập nội dung bình luận trước', 'Enter a comment first'],
+    ['评论已发布', 'Đã đăng bình luận', 'Comment posted'],
+    ['评论发布失败', 'Đăng bình luận thất bại', 'Failed to post comment'],
+    ['QQ 音乐评论', 'Bình luận QQ Music', 'QQ Music comments'],
+    ['汽水音乐评论', 'Bình luận Qishui Music', 'Qishui Music comments'],
+    ['网易云评论', 'Bình luận NetEase Cloud Music', 'NetEase Cloud Music comments'],
+    ['音乐用户', 'Người dùng âm nhạc', 'Music user'],
+    ['赞', 'lượt thích', 'likes'],
+    ['未找到歌手信息', 'Không tìm thấy thông tin ca sĩ', 'Artist information not found'],
+    ['正在查找歌手主页:', 'Đang tìm trang ca sĩ:', 'Finding artist page:'],
+    ['当前歌曲缺少歌手主页信息', 'Bài hiện tại thiếu thông tin trang ca sĩ', 'The current track has no artist-page information'],
+
+    // Custom cover / custom lyrics
+    ['封面已应用，存储空间不足', 'Đã áp dụng ảnh bìa nhưng không đủ dung lượng lưu trữ', 'Cover applied, but storage space is insufficient'],
+    ['封面已应用', 'Đã áp dụng ảnh bìa', 'Cover applied'],
+    ['封面已保存', 'Đã lưu ảnh bìa', 'Cover saved'],
+    ['已应用临时封面', 'Đã áp dụng ảnh bìa tạm thời', 'Temporary cover applied'],
+    ['取消自定义封面', 'Bỏ ảnh bìa tùy chỉnh', 'Remove custom cover'],
+    ['当前没有自定义封面', 'Bài hiện tại không có ảnh bìa tùy chỉnh', 'The current track has no custom cover'],
+    ['先播放或选择一首歌', 'Hãy phát hoặc chọn một bài hát trước', 'Play or select a track first'],
+    ['已恢复默认封面', 'Đã khôi phục ảnh bìa mặc định', 'Default cover restored'],
+    ['自定义歌词内容为空', 'Nội dung lời tùy chỉnh đang trống', 'Custom lyrics are empty'],
+    ['已切换到自定义歌词', 'Đã chuyển sang lời tùy chỉnh', 'Switched to custom lyrics'],
+    ['已切换到原歌词', 'Đã chuyển sang lời gốc', 'Switched to original lyrics'],
+    ['使用网易云或本地解析歌词', 'Dùng lời từ NetEase Cloud Music hoặc lời được phân tích cục bộ', 'Use NetEase Cloud Music lyrics or locally parsed lyrics'],
+
+    // Account/login terms generated dynamically
     ['网易云音乐', 'NetEase Cloud Music', 'NetEase Cloud Music'],
     ['网易云', 'NetEase Cloud', 'NetEase Cloud'],
     ['QQ 音乐', 'QQ Music', 'QQ Music'],
@@ -141,14 +220,15 @@
     ['展示到右上角账号胶囊', 'Hiển thị trong cụm tài khoản góc trên bên phải', 'Show in the top-right account pill'],
     ['展示', 'Hiển thị', 'Show'],
 
-    // Common labels that can occur inside formerly protected containers
-    ['登录', 'Đăng nhập', 'Sign in'],
+    // Common UI terms. Long/specific rows are applied first.
+    ['取消收藏', 'Bỏ lưu', 'Unsave'],
+    ['重新授权', 'Cấp quyền lại', 'Re-authorize'],
     ['退出登录', 'Đăng xuất', 'Sign out'],
+    ['登录', 'Đăng nhập', 'Sign in'],
     ['连接', 'Kết nối', 'Connect'],
     ['已连接', 'Đã kết nối', 'Connected'],
     ['未连接', 'Chưa kết nối', 'Not connected'],
     ['授权', 'Cấp quyền', 'Authorize'],
-    ['重新授权', 'Cấp quyền lại', 'Re-authorize'],
     ['播放', 'Phát', 'Play'],
     ['暂停', 'Tạm dừng', 'Pause'],
     ['下一首', 'Bài tiếp theo', 'Next track'],
@@ -158,12 +238,15 @@
     ['歌手', 'Ca sĩ', 'Artist'],
     ['专辑', 'Album', 'Album'],
     ['收藏', 'Lưu', 'Save'],
-    ['取消收藏', 'Bỏ lưu', 'Unsave'],
+    ['重命名', 'Đổi tên', 'Rename'],
+    ['删除', 'Xóa', 'Delete'],
+    ['移除', 'Gỡ bỏ', 'Remove'],
     ['刷新', 'Làm mới', 'Refresh'],
     ['重试', 'Thử lại', 'Retry'],
-    ['加载', 'Tải', 'Load'],
     ['加载中', 'Đang tải', 'Loading'],
+    ['载入中', 'Đang tải', 'Loading'],
     ['加载失败', 'Tải thất bại', 'Load failed'],
+    ['加载', 'Tải', 'Load'],
     ['失败', 'Thất bại', 'Failed'],
     ['成功', 'Thành công', 'Success'],
     ['关闭', 'Đóng', 'Close'],
@@ -181,12 +264,14 @@
     ['在线', 'Trực tuyến', 'Online'],
     ['默认', 'Mặc định', 'Default'],
     ['自动', 'Tự động', 'Auto'],
-    ['手动', 'Thủ công', 'Manual']
+    ['手动', 'Thủ công', 'Manual'],
+    ['当前', 'Hiện tại', 'Current']
   ];
 
   const exactSafeRaw = Object.create(null);
   [
     ['未知歌手', 'Không rõ ca sĩ', 'Unknown artist'],
+    ['未知专辑', 'Không rõ album', 'Unknown album'],
     ['歌单详情', 'Chi tiết playlist', 'Playlist details'],
     ['等待你的音乐', 'Đang chờ nhạc của bạn', 'Waiting for your music'],
     ['暂无歌曲', 'Chưa có bài hát', 'No tracks yet']
@@ -198,6 +283,7 @@
   const attrOutputs = new WeakMap();
   let observer = null;
   let applying = false;
+  let cachedRows = null;
 
   function language() {
     try {
@@ -208,6 +294,7 @@
   function targetIndex(lang) { return lang === 'en' ? 2 : 1; }
 
   function allRows() {
+    if (cachedRows) return cachedRows;
     const rows = [];
     const seen = new Set();
     function push(source, vi, en) {
@@ -229,21 +316,28 @@
       strictRows.forEach(function (row) { push(row[0], row[1], row[2]); });
     } catch (_) { }
     EXTRA_ROWS.forEach(function (row) { push(row[0], row[1], row[2]); });
-    return rows.sort(function (a, b) { return b[0].length - a[0].length; });
+    cachedRows = rows.sort(function (a, b) { return b[0].length - a[0].length; });
+    return cachedRows;
   }
 
-  function normalizeCounters(value, lang) {
+  function normalizeCountersAndDates(value, lang) {
     let result = String(value == null ? '' : value);
     result = result.replace(/(\d+)\s*首/g, function (_m, n) { return lang === 'vi' ? n + ' bài' : n + ' tracks'; });
     result = result.replace(/(\d+)\s*项/g, function (_m, n) { return lang === 'vi' ? n + ' mục' : n + ' items'; });
     result = result.replace(/(\d+)\s*个/g, function (_m, n) { return lang === 'vi' ? n + ' mục' : n + ' items'; });
     result = result.replace(/(\d+)\s*分钟/g, function (_m, n) { return lang === 'vi' ? n + ' phút' : n + ' min'; });
     result = result.replace(/(\d+)\s*秒/g, function (_m, n) { return lang === 'vi' ? n + ' giây' : n + ' s'; });
+    result = result.replace(/(\d{4})年(\d{1,2})月(\d{1,2})日/g, function (_m, y, m, d) {
+      return lang === 'vi' ? d + '/' + m + '/' + y : m + '/' + d + '/' + y;
+    });
+    result = result.replace(/(\d{1,2})月(\d{1,2})日/g, function (_m, m, d) {
+      return lang === 'vi' ? d + '/' + m : m + '/' + d;
+    });
     return result;
   }
 
   function translateKnown(value, lang) {
-    let result = normalizeCounters(value, lang);
+    let result = normalizeCountersAndDates(value, lang);
     const rows = allRows();
     const idx = targetIndex(lang);
     for (let i = 0; i < rows.length; i += 1) {
@@ -281,7 +375,7 @@
     if (tag === 'button' || role === 'button' || role === 'tab') return lang === 'vi' ? 'Tùy chọn' : 'Option';
     if (tag === 'label' || role === 'checkbox' || role === 'switch' || /label|status|badge/i.test(cls)) return lang === 'vi' ? 'Trạng thái' : 'Status';
     if (/title|heading|head/i.test(cls) || /^h[1-6]$/.test(tag)) return lang === 'vi' ? 'Thông tin' : 'Information';
-    if (/error|warning|notice|empty|progress/i.test(cls)) return lang === 'vi' ? 'Thông báo' : 'Notice';
+    if (/error|warning|notice|empty|progress|loading/i.test(cls)) return lang === 'vi' ? 'Thông báo' : 'Notice';
     return lang === 'vi' ? 'Nội dung' : 'Content';
   }
 
@@ -330,7 +424,13 @@
       const last = maps.outputs.get(attr);
       if (!maps.originals.has(attr) || (fromMutation && current !== last)) maps.originals.set(attr, current);
       const source = maps.originals.get(attr);
-      const output = localize(source, el);
+      // Attributes are app-owned controls even when attached to metadata rows.
+      // Do not inherit RAW/MIXED protection for tooltip/aria text.
+      let output = translateKnown(source, language());
+      if (HAN_RE.test(output)) {
+        output = output.replace(HAN_RUN_RE, contextFallback(el, language()))
+          .replace(/\s{2,}/g, ' ').trim();
+      }
       maps.outputs.set(attr, output);
       if (current !== output) el.setAttribute(attr, output);
     });
@@ -370,7 +470,7 @@
       const text = String(node.nodeValue || '').trim();
       if (text && HAN_RE.test(text) && !isRawContent(node) && !isMixedContent(node)) {
         count += 1;
-        if (samples.length < 40) samples.push(text.slice(0, 160));
+        if (samples.length < 50) samples.push(text.slice(0, 180));
       }
       node = walker.nextNode();
     }
@@ -409,6 +509,7 @@
   };
 
   window.addEventListener('mineradio:languagechange', function () {
+    // Rebuild aliases after the existing locale layers have switched.
     setTimeout(refresh, 0);
     setTimeout(refresh, 80);
     setTimeout(refresh, 300);

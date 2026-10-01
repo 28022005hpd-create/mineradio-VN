@@ -1,0 +1,87 @@
+name: Build Windows Installer
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-installer-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-windows:
+    name: Build Mineradio Setup.exe
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        shell: pwsh
+        run: npm ci
+
+      - name: Build Windows NSIS installer
+        shell: pwsh
+        run: npm run build:win -- --publish never
+
+      - name: Verify installer
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem -Path dist -Filter '*-Setup.exe' -File | Select-Object -First 1
+          if (-not $installer) {
+            Write-Host 'Contents of dist:'
+            Get-ChildItem -Path dist -Recurse -ErrorAction SilentlyContinue
+            throw 'Mineradio Setup.exe was not produced.'
+          }
+          Write-Host "Built installer: $($installer.FullName)"
+          "INSTALLER_NAME=$($installer.Name)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Upload Setup.exe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mineradio-Windows-Setup
+          path: dist/*-Setup.exe
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish installer to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = '${{ github.ref_name }}'
+          $files = Get-ChildItem -Path dist -Filter '*-Setup.exe' -File
+          if (-not $files) { throw 'No installer found for release.' }
+
+          $existing = gh release view $tag 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            foreach ($file in $files) {
+              gh release upload $tag $file.FullName --clobber
+            }
+          } else {
+            $args = @('release', 'create', $tag, '--title', "Mineradio $tag", '--generate-notes')
+            foreach ($file in $files) { $args += $file.FullName }
+            & gh @args
+          }

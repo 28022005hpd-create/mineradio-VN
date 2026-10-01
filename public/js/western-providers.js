@@ -39,6 +39,33 @@
     }
   }
 
+  async function configureSpotify() {
+    var status = typeof spotifyLoginStatus !== 'undefined' ? spotifyLoginStatus : {};
+    try {
+      if (!status.oauthConfigured) {
+        var clientId = window.prompt(copy('Spotify Client ID từ Spotify Developer Dashboard', 'Spotify Client ID from Spotify Developer Dashboard'), status.clientId || '');
+        if (clientId == null) return;
+        await json('/api/spotify/config', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clientId: clientId.replace(/\s+/g, ''), redirectUri: 'http://127.0.0.1:43879/callback' })
+        });
+        if (typeof refreshSpotifyLoginStatus === 'function') await refreshSpotifyLoginStatus();
+      }
+      toast(copy('Trình duyệt sẽ mở trang Spotify chính thức. Hãy hoàn tất cấp quyền.', 'Your browser will open Spotify’s official authorization page. Complete authorization there.'));
+      await json('/api/spotify/oauth/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      if (typeof refreshSpotifyLoginStatus === 'function') await refreshSpotifyLoginStatus();
+      refreshProviderButton('spotify');
+      try {
+        if (typeof activeAccountProvider !== 'undefined') activeAccountProvider = 'spotify';
+        if (typeof refreshUserPlaylists === 'function') await refreshUserPlaylists(true);
+        if (typeof renderUserBtn === 'function') renderUserBtn();
+      } catch (_) {}
+      toast(copy('Spotify đã được kết nối.', 'Spotify connected.'));
+    } catch (error) {
+      toast(copy('Kết nối Spotify thất bại: ', 'Spotify connection failed: ') + error.message);
+    }
+  }
+
   async function configureSoundcloud() {
     var current = statuses.soundcloud || {};
     var clientId = window.prompt(copy('SoundCloud Client ID', 'SoundCloud Client ID'), current.clientId || '');
@@ -51,6 +78,7 @@
         body: JSON.stringify({ clientId: clientId.trim(), clientSecret: clientSecret.trim() })
       });
       refreshProviderButton('soundcloud');
+      if (typeof updateSearchModeTabs === 'function') updateSearchModeTabs();
       toast(copy('Đã kết nối SoundCloud API.', 'SoundCloud API connected.'));
     } catch (error) { toast(copy('Kết nối SoundCloud thất bại: ', 'SoundCloud connection failed: ') + error.message); }
   }
@@ -64,6 +92,7 @@
         body: JSON.stringify({ apiKey: apiKey.trim() })
       });
       refreshProviderButton('youtube');
+      if (typeof updateSearchModeTabs === 'function') updateSearchModeTabs();
       toast(copy('Đã kết nối YouTube Music search.', 'YouTube Music search connected.'));
     } catch (error) { toast(copy('Kết nối YouTube Music thất bại: ', 'YouTube Music connection failed: ') + error.message); }
   }
@@ -77,7 +106,7 @@
     button.type = 'button';
     button.setAttribute('data-login-provider', provider);
     button.innerHTML = '<span class="provider-logo">' + short + '</span><b>' + label + '</b><small>' + sub + '</small><span class="flow-port out" data-login-provider-output="' + provider + '"></span><span class="western-provider-state"></span>';
-    if (provider === 'spotify') button.onclick = function () { if (typeof selectLoginProviderNode === 'function') selectLoginProviderNode('spotify'); };
+    if (provider === 'spotify') button.onclick = configureSpotify;
     else if (provider === 'soundcloud') button.onclick = configureSoundcloud;
     else button.onclick = configureYoutube;
     host.appendChild(button);
@@ -86,12 +115,13 @@
   function refreshProviderButton(provider) {
     var button = document.getElementById('login-provider-' + provider);
     if (!button) return;
-    var status = provider === 'spotify' ? (window.spotifyLoginStatus || (typeof spotifyLoginStatus !== 'undefined' ? spotifyLoginStatus : {})) : statuses[provider];
+    var status = provider === 'spotify' ? (typeof spotifyLoginStatus !== 'undefined' ? spotifyLoginStatus : {}) : statuses[provider];
     var state = button.querySelector('.western-provider-state');
     var ready = !!(status && (status.loggedIn || status.configured || (status.capabilities && status.capabilities.search)));
     button.classList.toggle('connected', ready);
     if (state) state.textContent = ready ? '●' : '○';
     var small = button.querySelector('small');
+    if (small && provider === 'spotify') small.textContent = status && status.loggedIn ? copy('Đã kết nối OAuth', 'OAuth connected') : (status && status.oauthConfigured ? copy('Sẵn sàng OAuth', 'OAuth ready') : 'OAuth PKCE');
     if (small && provider === 'soundcloud') small.textContent = ready ? copy('API đã sẵn sàng', 'API ready') : copy('OAuth/API chính thức', 'Official OAuth/API');
     if (small && provider === 'youtube') small.textContent = ready ? copy('Tìm kiếm đã sẵn sàng', 'Search ready') : copy('YouTube Data API', 'YouTube Data API');
   }
@@ -239,6 +269,7 @@
 
   window.MineradioWesternProviders = {
     refresh: refreshStatus,
+    configureSpotify: configureSpotify,
     configureSoundcloud: configureSoundcloud,
     configureYoutube: configureYoutube,
     statuses: statuses,

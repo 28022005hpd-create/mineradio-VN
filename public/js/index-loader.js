@@ -7,6 +7,8 @@
     'js/i18n-extra.js',
     'js/i18n-strict.js',
     'js/i18n-native-bridge.js',
+    'js/i18n-ui-final.js',
+    'js/i18n-content-boundaries.js',
     'js/modules/00-state/00-core-stores.js',
     'js/modules/00-state/01-perf-render-state.js',
     'js/modules/00-state/02-preferences-ui-modes.js',

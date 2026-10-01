@@ -13,5 +13,8 @@ if (!process.env.MINERADIO_PROVIDER_CONFIG_DIR) {
   }
 }
 
+// Order matters: OAuth must wrap createServer before the broader /api/spotify
+// bridge so /api/spotify/oauth/start is handled by the PKCE callback bridge.
+require('../spotify-oauth-bridge-api').installSpotifyOAuthBridge();
 require('../western-providers-api').installHttpProviderBridge();
 module.exports = require('./main-localized');

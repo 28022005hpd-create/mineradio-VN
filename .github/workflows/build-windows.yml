@@ -56,6 +56,7 @@ jobs:
           node --check desktop/main-localized.js
           node --check desktop/main-providers.js
           node --check western-providers-api.js
+          node --check spotify-oauth-bridge-api.js
           node --check spotify-api.js
           node --check build/localize-installer.js
 

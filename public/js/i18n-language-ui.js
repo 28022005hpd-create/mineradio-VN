@@ -46,10 +46,53 @@
     if (switcher && switcher.parentNode) switcher.parentNode.removeChild(switcher);
   }
 
-  // Do not load i18n-language-ui-legacy.js. That file owns the old VI/EN menu
-  // and an additional MutationObserver, both of which caused translation feedback.
+  function installDeferredLegacyI18nGate() {
+    if (document.readyState !== 'loading' || window.__mineradioDeferredI18nGateInstalled) return;
+    window.__mineradioDeferredI18nGateInstalled = true;
+
+    const NativeMutationObserver = window.__mineradioNativeMutationObserver || window.MutationObserver;
+    const nativeCreateTreeWalker = document.createTreeWalker.bind(document);
+
+    function DormantMutationObserver(callback) {
+      this._callback = callback;
+      this._records = [];
+    }
+    DormantMutationObserver.prototype.observe = function () { };
+    DormantMutationObserver.prototype.disconnect = function () { this._records.length = 0; };
+    DormantMutationObserver.prototype.takeRecords = function () {
+      const records = this._records.slice();
+      this._records.length = 0;
+      return records;
+    };
+
+    // Older i18n layers registered DOMContentLoaded handlers before the stable
+    // runtime existed. During only those early handlers, prevent them from
+    // constructing extra observers or destructively walking the whole page.
+    document.addEventListener('DOMContentLoaded', function () {
+      window.MutationObserver = DormantMutationObserver;
+      window.WebKitMutationObserver = DormantMutationObserver;
+      document.createTreeWalker = function () {
+        return { nextNode: function () { return null; } };
+      };
+    }, true);
+
+    // This listener is registered before application modules loaded later in
+    // index-loader, but after the legacy i18n listeners. Restore browser APIs so
+    // the rest of Mineradio receives the real MutationObserver/TreeWalker.
+    document.addEventListener('DOMContentLoaded', function () {
+      window.MutationObserver = NativeMutationObserver;
+      window.WebKitMutationObserver = NativeMutationObserver;
+      document.createTreeWalker = nativeCreateTreeWalker;
+    }, false);
+  }
+
+  // Keep Vietnamese as the only locale and extend the dictionary before the
+  // single stable observer builds its translation table.
   forceVietnamese();
+  installDeferredLegacyI18nGate();
+  load('js/i18n-vi-polish.js');
   load('js/i18n-runtime-stable.js');
+  load('js/ui-vietnamese-polish.js');
   forceVietnamese();
 
   if (document.readyState === 'loading') {

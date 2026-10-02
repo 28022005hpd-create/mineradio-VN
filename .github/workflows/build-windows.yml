@@ -51,7 +51,9 @@ jobs:
           node --check public/js/i18n-ui-final.js
           node --check public/js/i18n-content-boundaries.js
           node --check public/js/i18n-native-bridge.js
+          node --check public/js/i18n-vi-polish.js
           node --check public/js/i18n-language-ui.js
+          node --check public/js/ui-vietnamese-polish.js
           node --check public/js/western-providers.js
           node --check public/js/western-playback.js
           node --check public/js/index-loader.js

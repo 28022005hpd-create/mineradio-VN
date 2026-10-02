@@ -3,6 +3,7 @@
 (function loadMineradioIndexModules() {
   const moduleCacheBust = String(Date.now());
   const modulePaths = [
+    'js/i18n-vi-lock.js',
     'js/i18n.js',
     'js/i18n-extra.js',
     'js/i18n-strict.js',

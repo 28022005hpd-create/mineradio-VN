@@ -44,6 +44,7 @@ jobs:
       - name: Validate localization and provider JavaScript
         shell: pwsh
         run: |
+          node --check public/js/i18n-vi-lock.js
           node --check public/js/i18n.js
           node --check public/js/i18n-extra.js
           node --check public/js/i18n-strict.js
